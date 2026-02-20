@@ -18,7 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _progressText = '';
   bool _isDragging = false;
   String _targetFormat = 'PNG';
-  final List<String> _formats = ['PNG', 'JPG', 'BMP', 'PDF'];
+  final List<String> _formats = ['PNG', 'JPG', 'WEBP', 'PDF'];
 
   /// Sistem dosya seçicisinden kullanıcının seçtiği dosyaları ekler.
   /// Adds files selected by the user from the system file picker.
@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom, // Custom diyoruz ki uzantıları biz belirleyelim
-      allowedExtensions: ['png', 'jpg', 'jpeg', 'bmp'], // İzin verilenler
+      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'], // İzin verilenler
     );
 
     if (result != null) {
@@ -67,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onDragDone: (detail) {
                   // İzin verilen uzantılarımız
                   // Allowed extensions
-                  const allowedExtensions = ['png', 'jpg', 'jpeg', 'bmp'];
+                  const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
 
                   final validFiles = detail.files.where((f) {
                     final ext = f.name.split('.').last.toLowerCase();

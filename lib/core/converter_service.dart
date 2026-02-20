@@ -7,8 +7,6 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
 class ConverterService {
-  /// Seçilen dosyaları hedef formata dönüştürür ve ilerleme bilgisi sağlar.
-  /// Converts selected files to target format and provides progress information.
   Future<void> convertFiles(
     List<XFile> files,
     String targetFormat,
@@ -35,7 +33,11 @@ class ConverterService {
       try {
         if (targetFormat == 'PDF') {
           await _convertToPdf(file, newPath);
+        } else if (targetFormat == 'WEBP') {
+          // EXE dosyasını çağırıyoruz (Process.run)
+          await _convertToWebpViaProcess(originalPath, newPath);
         } else {
+          // PNG ve JPG için klasik Isolate (arka plan) motorumuz
           final bytes = await file.readAsBytes();
           final convertedBytes = await Isolate.run(
             () => _convertImageIsolate(bytes, targetFormat),
@@ -55,8 +57,33 @@ class ConverterService {
     }
   }
 
-  /// Resim dosyasını PDF formatına dönüştürür.
-  /// Converts image file to PDF format.
+  // --- HACKER YOLU: cwebp.exe Entegrasyonu ---
+  Future<void> _convertToWebpViaProcess(
+    String inputPath,
+    String outputPath,
+  ) async {
+    // Flutter derlendikten sonra asset'leri 'data/flutter_assets' içine atar.
+    // Windows'ta çalışırken exe'nin tam yolunu dinamik olarak bulmalıyız.
+    final executableDir = File(Platform.resolvedExecutable).parent.path;
+    final exePath = '$executableDir\\data\\flutter_assets\\assets\\cwebp.exe';
+
+    if (!await File(exePath).exists()) {
+      throw Exception("cwebp.exe bulunamadı! Yol: $exePath");
+    }
+
+    // Terminal komutunu gizlice çalıştır
+    final result = await Process.run(exePath, [
+      '-q', '80', // Kalite ayarı
+      inputPath,
+      '-o', outputPath,
+    ]);
+
+    if (result.exitCode != 0) {
+      throw Exception("WEBP dönüştürme patladı: ${result.stderr}");
+    }
+  }
+
+  // --- KLASİK METODLAR ---
   Future<void> _convertToPdf(File imageFile, String outputPath) async {
     final pdf = pw.Document();
     final imageBytes = await imageFile.readAsBytes();
@@ -73,8 +100,6 @@ class ConverterService {
     await File(outputPath).writeAsBytes(await pdf.save());
   }
 
-  /// Resim baytlarını istenen formata dönüştürür (Isolate içinde çalışır, UI'yi engellemez).
-  /// Converts image bytes to desired format (runs in Isolate, doesn't block UI).
   static Uint8List? _convertImageIsolate(Uint8List bytes, String targetFormat) {
     final decodedImage = img.decodeImage(bytes);
     if (decodedImage == null) return null;
@@ -84,8 +109,6 @@ class ConverterService {
         return img.encodeJpg(decodedImage, quality: 90);
       case 'PNG':
         return img.encodePng(decodedImage);
-      case 'BMP':
-        return img.encodeBmp(decodedImage);
       default:
         return null;
     }

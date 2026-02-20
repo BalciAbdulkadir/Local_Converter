@@ -30,8 +30,8 @@ Privacy-first, offline desktop file converter built with Flutter. This applicati
 
     [x] Background processing with Isolates
 
-    [ ] Add real-time progress bar UI
+    [x] Add real-time progress bar UI
 
-    [ ] Add custom error handling for unsupported file types
+    [x] Add custom error handling for unsupported file types
 
     [ ] Extend to Android with Scoped Storage support

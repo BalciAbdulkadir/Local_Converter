@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 
-/// Uygulamayı başlatır.
-/// Starts the application.
 void main() {
   runApp(const LocalConverterApp());
 }
