@@ -13,6 +13,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final List<XFile> _selectedFiles = [];
+  bool _isConverting = false;
+  double _progressValue = 0.0;
+  String _progressText = '';
   bool _isDragging = false;
   String _targetFormat = 'PNG';
   final List<String> _formats = ['PNG', 'JPG', 'BMP', 'PDF'];
@@ -22,7 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pickFiles() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
-      type: FileType.image,
+      type: FileType.custom, // Custom diyoruz ki uzantıları biz belirleyelim
+      allowedExtensions: ['png', 'jpg', 'jpeg', 'bmp'], // İzin verilenler
     );
 
     if (result != null) {
@@ -61,15 +65,29 @@ class _HomeScreenState extends State<HomeScreen> {
               flex: 2,
               child: DropTarget(
                 onDragDone: (detail) {
+                  // İzin verilen uzantılarımız
+                  // Allowed extensions
+                  const allowedExtensions = ['png', 'jpg', 'jpeg', 'bmp'];
+
+                  final validFiles = detail.files.where((f) {
+                    final ext = f.name.split('.').last.toLowerCase();
+                    return allowedExtensions.contains(ext);
+                  }).toList();
+
+                  if (validFiles.length < detail.files.length) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Sadece PNG, JPG ve BMP atabilirsin. Geçersiz dosyalar ayıklandı.',
+                        ),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                  }
+
                   setState(() {
-                    _selectedFiles.addAll(detail.files);
+                    _selectedFiles.addAll(validFiles);
                   });
-                },
-                onDragEntered: (detail) {
-                  setState(() => _isDragging = true);
-                },
-                onDragExited: (detail) {
-                  setState(() => _isDragging = false);
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -143,6 +161,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           height: 2,
                           color: Colors.blueAccent,
                         ),
+
+                        onChanged: _isConverting
+                            ? null
+                            : (String? newValue) {
+                                if (newValue != null) {
+                                  setState(() => _targetFormat = newValue);
+                                }
+                              },
                         items: _formats.map((String format) {
                           return DropdownMenuItem<String>(
                             value: format,
@@ -154,42 +180,50 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           );
                         }).toList(),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() => _targetFormat = newValue);
-                          }
-                        },
                       ),
                     ],
                   ),
                   ElevatedButton.icon(
-                    onPressed: _selectedFiles.isEmpty
+                    onPressed: (_selectedFiles.isEmpty || _isConverting)
                         ? null
                         : () async {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Dönüşüm başladı, bekle...'),
-                              ),
-                            );
+                            setState(() {
+                              _isConverting = true;
+                              _progressValue = 0.0;
+                              _progressText = 'Dönüşüm başlatılıyor...';
+                            });
 
-                            final converter =
-                                ConverterService(); // Dosyanın en üstüne import etmeyi unutma!
+                            final converter = ConverterService();
 
                             await converter.convertFiles(
                               _selectedFiles,
                               _targetFormat,
-                              (message) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(message),
-                                    duration: const Duration(seconds: 1),
-                                  ),
-                                );
+                              (current, total, message) {
+                                setState(() {
+                                  _progressValue = current / total;
+                                  _progressText = message;
+                                });
                               },
                             );
+
+                            await Future.delayed(const Duration(seconds: 2));
+                            setState(() {
+                              _isConverting = false;
+                              _progressValue = 0.0;
+                              _progressText = 'Tüm dosyalar dönüştürüldü!';
+                            });
                           },
-                    icon: const Icon(Icons.transform),
-                    label: const Text('Dönüştür'),
+                    icon: _isConverting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.transform),
+                    label: Text(_isConverting ? 'İşleniyor...' : 'Dönüştür'),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
@@ -202,8 +236,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
 
+            if (_isConverting || _progressText.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _progressText,
+                    style: const TextStyle(
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: _progressValue,
+                      minHeight: 8,
+                      backgroundColor: Colors.black26,
+                      color: Colors.blueAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 16),
             Expanded(
               flex: 3,
               child: _selectedFiles.isEmpty

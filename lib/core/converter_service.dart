@@ -12,15 +12,18 @@ class ConverterService {
   Future<void> convertFiles(
     List<XFile> files,
     String targetFormat,
-    Function(String) onProgress,
+    Function(int current, int total, String message) onProgress,
   ) async {
-    for (var xFile in files) {
+    int totalFiles = files.length;
+
+    for (int i = 0; i < totalFiles; i++) {
+      var xFile = files[i];
       final originalPath = xFile.path;
       final file = File(originalPath);
 
       if (!await file.exists()) continue;
 
-      onProgress('${xFile.name} işleniyor...');
+      onProgress(i, totalFiles, '${xFile.name} işleniyor...');
 
       final lastDotIndex = originalPath.lastIndexOf('.');
       final pathWithoutExtension = lastDotIndex != -1
@@ -34,18 +37,20 @@ class ConverterService {
           await _convertToPdf(file, newPath);
         } else {
           final bytes = await file.readAsBytes();
-
           final convertedBytes = await Isolate.run(
             () => _convertImageIsolate(bytes, targetFormat),
           );
 
           if (convertedBytes != null) {
             await File(newPath).writeAsBytes(convertedBytes);
+          } else {
+            throw Exception("Dönüştürme motoru boş döndü amk!");
           }
         }
-        onProgress('${xFile.name} başarıyla dönüştürüldü!');
+
+        onProgress(i + 1, totalFiles, '${xFile.name} tamamlandı!');
       } catch (e) {
-        onProgress('HATA - ${xFile.name}: $e');
+        onProgress(i + 1, totalFiles, 'HATA - ${xFile.name}: $e');
       }
     }
   }
