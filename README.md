@@ -24,3 +24,14 @@ Privacy-first, offline desktop file converter built with Flutter. This applicati
 * Flutter SDK (3.x.x or higher)
 * Visual Studio 2022 with "Desktop development with C++" workload (for Windows compilation)
 
+📝 Roadmap
+
+    [x] Windows Desktop MVP
+
+    [x] Background processing with Isolates
+
+    [ ] Add real-time progress bar UI
+
+    [ ] Add custom error handling for unsupported file types
+
+    [ ] Extend to Android with Scoped Storage support
