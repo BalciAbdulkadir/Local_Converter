@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# FFmpeg is large; bundle it into assets/ locally for release builds but do not commit it
+assets/ffmpeg*.exe
