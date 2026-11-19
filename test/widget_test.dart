@@ -98,9 +98,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1 dosyayı BMP formatına dönüştür'), findsOneWidget);
 
-    await tester.runAsync(() => c.start());
+    // Varsayılan mod "Her seferinde sor": arayüz klasörü sorar ve start'a verir.
+    expect(find.text('Her seferinde sor'), findsOneWidget);
+    final outDir = Directory(p.join(tmp.path, 'cikti'))..createSync();
+    await tester.runAsync(() => c.start(askedDirectory: outDir.path));
     await tester.pumpAndSettle();
     expect(find.text('1 başarılı'), findsOneWidget);
-    expect(File(p.join(tmp.path, 'resim.bmp')).existsSync(), isTrue);
+    expect(File(p.join(outDir.path, 'resim.bmp')).existsSync(), isTrue);
+  });
+
+  group('çıktı konumu', () {
+    late ConverterController c;
+    late String src;
+
+    setUp(() async {
+      c = controller();
+      await c.init();
+      src = png('resim.png');
+      c.addPaths([src]);
+      c.setTarget(Formats.bmp);
+    });
+
+    test('varsayılan "her seferinde sor"; klasör seçilmezse dönüşüm başlamaz', () async {
+      expect(c.outputLocation, OutputLocation.askEveryTime);
+      await c.start();
+      expect(c.files.single.status, isNull);
+      expect(File(p.join(tmp.path, 'resim.bmp')).existsSync(), isFalse);
+    });
+
+    test('sorulan klasöre kaydeder ve bir sonraki soru için hatırlar', () async {
+      final out = Directory(p.join(tmp.path, 'secilen'))..createSync();
+      expect(c.suggestedOutputDirectory, tmp.path, reason: 'ilk seferde kaynak klasör önerilir');
+      await c.start(askedDirectory: out.path);
+      expect(c.files.single.outputs.single, p.join(out.path, 'resim.bmp'));
+      expect(c.suggestedOutputDirectory, out.path);
+    });
+
+    test('kaynak dosyanın yanına', () async {
+      c.setOutputLocation(OutputLocation.sameAsSource);
+      await c.start();
+      expect(c.files.single.outputs.single, p.join(tmp.path, 'resim.bmp'));
+    });
+
+    test('sabit klasör seçilmeden sabit klasör moduna geçilmez', () async {
+      c.setOutputLocation(OutputLocation.fixedFolder);
+      expect(c.outputLocation, OutputLocation.askEveryTime);
+      final fixed = Directory(p.join(tmp.path, 'sabit'))..createSync();
+      c.setOutputLocation(OutputLocation.fixedFolder, folder: fixed.path);
+      await c.start();
+      expect(c.files.single.outputs.single, p.join(fixed.path, 'resim.bmp'));
+    });
   });
 }

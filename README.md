@@ -9,7 +9,7 @@ A privacy-first, offline desktop file converter built with Flutter. Convert imag
 * **Complete Privacy:** 100% local processing. No internet connection required, no cloud uploads.
 * **One window for everything:** Drop any mix of files or whole folders; the app only offers target formats that work for *all* selected files.
 * **Batch processing:** Parallel conversion for images/documents/data, per-file progress, cancel at any time.
-* **Safe output:** Existing files are never overwritten (`name (1).ext`), output can go next to the source or into a folder of your choice.
+* **You choose where to save:** By default the app asks for a destination folder every time you press Convert; you can also save next to the source or always into a fixed folder. Existing files are never overwritten (`name (1).ext`).
 * **Turkish-friendly:** PDF output embeds Windows system fonts so `ş ğ ı İ` render correctly; CSV output can use `;` and a UTF-8 BOM for Turkish Excel.
 
 ## 📦 Supported Conversions

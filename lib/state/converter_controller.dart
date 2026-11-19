@@ -32,6 +32,18 @@ class FileEntry {
   }
 }
 
+/// Çıktı dosyalarının nereye kaydedileceği.
+enum OutputLocation {
+  /// Her dönüşümde klasör sorulur (varsayılan).
+  askEveryTime,
+
+  /// Kaynak dosyanın bulunduğu klasör.
+  sameAsSource,
+
+  /// Kullanıcının bir kez seçtiği sabit klasör ([ConversionOptions.outputDirectory]).
+  fixedFolder,
+}
+
 /// Dosya ekleme sonucunun özeti (kullanıcıya bildirim için).
 class AddResult {
   const AddResult({this.added = 0, this.unsupported = const [], this.duplicates = 0});
@@ -63,6 +75,13 @@ class ConverterController extends ChangeNotifier {
 
   ConversionOptions _options = const ConversionOptions();
   ConversionOptions get options => _options;
+
+  OutputLocation _outputLocation = OutputLocation.askEveryTime;
+  OutputLocation get outputLocation => _outputLocation;
+
+  /// "Her seferinde sor" modunda en son seçilen klasör; bir sonraki sorguda
+  /// pencere bu klasörde açılır.
+  String? lastAskedDirectory;
 
   bool _running = false;
   bool get isRunning => _running;
@@ -191,6 +210,19 @@ class ConverterController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Çıktı konumu modunu değiştirir. Sabit klasör modunda [folder] verilmelidir.
+  void setOutputLocation(OutputLocation location, {String? folder}) {
+    if (_running) return;
+    if (location == OutputLocation.fixedFolder && folder == null && _options.outputDirectory == null) return;
+    _outputLocation = location;
+    if (folder != null) _options = _options.copyWith(outputDirectory: () => folder);
+    notifyListeners();
+  }
+
+  /// Klasör sorulurken pencerenin açılacağı başlangıç klasörü.
+  String? get suggestedOutputDirectory =>
+      lastAskedDirectory ?? (files.isEmpty ? null : p.dirname(files.first.path));
+
   void _ensureValidTarget() {
     final targets = availableTargets;
     if (_target != null && !targets.contains(_target)) _target = null;
@@ -219,8 +251,21 @@ class ConverterController extends ChangeNotifier {
   /// Tüm çıktı dosyaları (benzersiz).
   List<String> get allOutputs => {for (final f in files) ...f.outputs}.toList();
 
-  Future<void> start() async {
+  /// Dönüşümü başlatır. "Her seferinde sor" modunda [askedDirectory] arayüzde
+  /// kullanıcıya sorulup verilmelidir; verilmezse dönüşüm başlamaz.
+  Future<void> start({String? askedDirectory}) async {
     if (!canStart) return;
+    final ConversionOptions runOptions;
+    switch (_outputLocation) {
+      case OutputLocation.askEveryTime:
+        if (askedDirectory == null) return;
+        lastAskedDirectory = askedDirectory;
+        runOptions = _options.copyWith(outputDirectory: () => askedDirectory);
+      case OutputLocation.sameAsSource:
+        runOptions = _options.copyWith(outputDirectory: () => null);
+      case OutputLocation.fixedFolder:
+        runOptions = _options;
+    }
     final target = _target!;
     _running = true;
     final token = _cancelToken = CancelToken();
@@ -235,7 +280,7 @@ class ConverterController extends ChangeNotifier {
       await service.runBatch(
         inputs: [for (final f in snapshot) f.path],
         target: target,
-        options: _options,
+        options: runOptions,
         tools: tools,
         cancelToken: token,
         onUpdate: (i, u) {

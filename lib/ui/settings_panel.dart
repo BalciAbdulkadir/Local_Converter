@@ -420,44 +420,53 @@ class _OutputSection extends StatelessWidget {
     final c = controller;
     final dir = c.options.outputDirectory;
     final enabled = !c.isRunning;
+    final fixed = c.outputLocation == OutputLocation.fixedFolder;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _SectionTitle('Çıktı konumu'),
-        RadioGroup<bool>(
-          groupValue: dir == null,
-          onChanged: (sameFolder) async {
-            if (!enabled || sameFolder == null) return;
-            if (sameFolder) {
-              c.updateOptions(c.options.copyWith(outputDirectory: () => null));
-            } else {
+        RadioGroup<OutputLocation>(
+          groupValue: c.outputLocation,
+          onChanged: (location) async {
+            if (!enabled || location == null) return;
+            if (location == OutputLocation.fixedFolder && dir == null) {
               await _pickFolder(c);
+            } else {
+              c.setOutputLocation(location);
             }
           },
           child: Column(children: [
-            RadioListTile<bool>(
+            RadioListTile<OutputLocation>(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              value: true,
+              value: OutputLocation.askEveryTime,
+              enabled: enabled,
+              title: const Text('Her seferinde sor'),
+              subtitle: const Text('Dönüştür\'e basınca kayıt klasörünü seçersiniz'),
+            ),
+            RadioListTile<OutputLocation>(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: OutputLocation.sameAsSource,
               enabled: enabled,
               title: const Text('Kaynak dosyanın yanına'),
             ),
-            RadioListTile<bool>(
+            RadioListTile<OutputLocation>(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              value: false,
+              value: OutputLocation.fixedFolder,
               enabled: enabled,
-              title: const Text('Seçtiğim klasöre'),
+              title: const Text('Her zaman bu klasöre'),
               subtitle: dir == null
                   ? null
                   : Text(dir, maxLines: 2, overflow: TextOverflow.ellipsis),
-              secondary: dir == null
-                  ? null
-                  : IconButton(
+              secondary: fixed && dir != null
+                  ? IconButton(
                       tooltip: 'Klasörü değiştir',
                       icon: const Icon(Icons.edit_outlined, size: 20),
                       onPressed: enabled ? () => _pickFolder(c) : null,
-                    ),
+                    )
+                  : null,
             ),
           ]),
         ),
@@ -470,8 +479,12 @@ class _OutputSection extends StatelessWidget {
   }
 
   Future<void> _pickFolder(ConverterController c) async {
-    final path = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Çıktı klasörünü seçin');
-    if (path != null) c.updateOptions(c.options.copyWith(outputDirectory: () => path));
+    final path = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Çıktıların her zaman kaydedileceği klasörü seçin',
+      initialDirectory: c.options.outputDirectory ?? c.suggestedOutputDirectory,
+      lockParentWindow: true,
+    );
+    if (path != null) c.setOutputLocation(OutputLocation.fixedFolder, folder: path);
   }
 }
 
@@ -480,6 +493,21 @@ class _OutputSection extends StatelessWidget {
 class _ActionBar extends StatelessWidget {
   const _ActionBar({required this.controller});
   final ConverterController controller;
+
+  /// "Her seferinde sor" modunda önce kayıt klasörünü sorar; iptal edilirse başlamaz.
+  Future<void> _start(ConverterController c) async {
+    if (c.outputLocation != OutputLocation.askEveryTime) {
+      await c.start();
+      return;
+    }
+    final dir = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Dönüştürülen dosyalar nereye kaydedilsin?',
+      initialDirectory: c.suggestedOutputDirectory,
+      lockParentWindow: true,
+    );
+    if (dir == null) return;
+    await c.start(askedDirectory: dir);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +564,7 @@ class _ActionBar extends StatelessWidget {
             )
           else
             FilledButton.icon(
-              onPressed: c.canStart ? c.start : null,
+              onPressed: c.canStart ? () => _start(c) : null,
               icon: const Icon(Icons.bolt),
               label: Text(c.target == null
                   ? 'Hedef format seçin'
